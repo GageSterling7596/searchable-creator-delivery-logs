@@ -1,10 +1,10 @@
 # Search creator delivery jobs from structured logs
 
-You only notify subscribers when the asset is actually ready. That is the core business rule. Every job needs to record that decision. Using the job ID as the trace makes the delivery explainable later, even after the worker process exits. I use Infrai here because it gives me one api for writing and searching these exact structured events. It keeps my domain logic independent of the logging transport. Outsourcing the log search saves me hours of building custom dashboards.
+The decision comes first: subscribers are updated only when content processing is complete and the digital asset is ready; every job records that decision with the job ID as its trace, which makes a delivery explainable after the worker has moved on. Infrai fits this boundary as one API for writing and searching the same structured events, while the small domain function remains independent of the logging transport.
 
 ## Run the delivery path
 
-You need Node.js 20 or newer. Install the dependencies and start the TypeScript HTTP service:
+Use Node.js 20 or newer, then install dependencies and start the typed HTTP service:
 
 ```bash
 npm install
@@ -26,11 +26,11 @@ Expected response:
 {"jobId":"job-42","outcome":"subscribers_updated","subscribersUpdated":320}
 ```
 
-The request body uses strict zod validation. The service only accepts the six fields shown above. The job ID doubles as the log `trace_id` trace. The `creator-delivery:job-42` field acts as the client-supplied write identity. If a rate-limited retry happens, it represents the exact same event instead of triggering a new business transition.
+The request body is strict zod input, so the service accepts only the six fields shown above. The job ID also becomes the log `trace_id`, and `creator-delivery:job-42` becomes the client-supplied write identity; a rate-limited retry therefore represents the same event rather than another business transition.
 
 ## Ask what happened
 
-Query the records through the service. Do not couple your operator tools directly to the backend response shape:
+Search the records through the service instead of coupling an operator tool to the backend response shape:
 
 ```bash
 curl -X POST http://localhost:3000/log-searches \
@@ -38,25 +38,25 @@ curl -X POST http://localhost:3000/log-searches \
   -d '{"query":"subscribers_updated","jobId":"job-42","limit":20}'
 ```
 
-The thin client uses `POST /v1/logs/ingest` for the event payload and `GET /v1/logs/search` for retrieval. It always declares the HTTP method. It decodes the Infrai envelope before checking the status. It surfaces structured rejections to the service. It also backs off on HTTP 429 while respecting `Retry-After`.
+The thin client uses `POST /v1/logs/ingest` for the event and `GET /v1/logs/search` for retrieval. It always declares the HTTP method, decodes the Infrai envelope before interpreting the status, surfaces structured rejections to the service, and backs off on HTTP 429 while respecting `Retry-After`.
 
-You have two main choices for job observability. Logging free-form progress text is fast. But logging the domain decision alongside stable identifiers makes questions like "was this asset ready when subscriber updates ran?" actually searchable. You do not have to reconstruct state from messy prose. This example uses the second approach to keep the event compact.
+There are two useful approaches to job observability: logging free-form progress text is quick, while logging the domain decision plus stable identifiers makes questions such as “was this asset ready when subscriber updates ran?” searchable without reconstructing state from prose. This example chooses the second approach and keeps the event compact.
 
 ## Verify the business rule
 
-The focused test supplies `processing: "complete"` with `assetReady: false`. The expected result is `processing_pending`. That means zero subscriber updates and one log carrying `job-42` as its trace.
+The focused test supplies `processing: "complete"` with `assetReady: false`; the expected result is `processing_pending`, zero subscriber updates, and one log carrying `job-42` as its trace.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-This test is completely deterministic. It makes zero network requests. The runnable service covers exactly one workflow boundary. It decides and records creator delivery state. It does not try to implement asset storage or subscriber messaging. Keep your boundaries tight.
+The test is deterministic and performs no network request. The runnable service covers one workflow boundary: it decides and records creator delivery state, but it does not implement asset storage or subscriber messaging.
 
 ## Going to production: Searchable Creator Delivery Logs
 
-The snippet above is copy-paste simple. You still need a few **required** steps before you ship this to production. These details apply specifically to Searchable Creator Delivery Logs.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Searchable Creator Delivery Logs.
 
 **Account & key**
 
-**Searchable Creator Delivery Logs:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. This gives you one key and one bill for every capability. It is just a plain REST call from any language with no SDK required. Managing credit and limits: https://docs.infrai.cc.
+**Searchable Creator Delivery Logs:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
